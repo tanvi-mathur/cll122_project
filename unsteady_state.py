@@ -61,6 +61,14 @@ for r in range(n_reactions):
 
 st.sidebar.header("3. Reactor Configuration")
 reactor_type = st.sidebar.selectbox("Reactor Type", ["Batch", "CSTR", "PFR"])
+v=0
+rho=0
+L=1
+N=100
+if reactor_type=="PFR":
+    v=st.sidebar.number_input("Velocity (m/min): ", value=10)
+    L=st.sidebar.number_input("Length of reactor (m): ", value=10)
+    N=st.sidebar.number_input("Number of spatial segments: ", value=100)
 V = st.sidebar.number_input("Volume (m^3)", value=1.0)
 flow_rate = st.sidebar.number_input("Volumetric Flow rate (for CSTR/PFR) (m^3/s)", value=1.0)
 
@@ -121,7 +129,7 @@ def odes(t, y):
     r = rate_laws(C, T)
     CpS=0
     for i in range(n_species):
-        CpS+=Cp[i]*(initial_conc[i]/initial_conc[0])
+        CpS+=Cp[i]*(initial_conc[i])*V
     for i in range(n_species):
         CpS+=initial_conc[i]*X*coeff[i]
     
@@ -146,45 +154,73 @@ def odes(t, y):
             dCdt[i] += (flow_rate / V) * (initial_conc[i] - C[i])
             
         dTdt = (-flow_rate*initial_conc[0] * Cp[i] * (T-T0) +Qg-Qr) / CpS
-    elif reactor_type == "PFR":
-        # PFR modeled with time as space proxy, for simplicity
+    elif reactor_type == "Batch":
         dTdt = (Qg-Qr) / CpS
-    else:  # Batch
-        dTdt = (Qg-Qr) / CpS
-
+    else:
+        pfr_transient(dCdt, dTdt)
     return list(dCdt) + [dTdt]
 
-# ---- Solve ----
 time_span = st.sidebar.number_input("Enter time span: ", value=10)
 
+dt_sim = st.number_input("Simulation Time Increment", value=1.0)
+total_time = st.number_input("Total Simulation Time", value=10.0)
+def pfr_transient(dCdt, dTdt):
+    N=100
+    dz=L/N
+    for i in range(1, N):
+
+        dCdt[i] = (-v * (C[i] - C[i-1]))*V/ dz + r
+        dTdt[i] = (-v * (T[i] - T[i-1]) / dz + (Qg-Qr)) / CpS
+    # Inlet boundary condition (Dirichlet)
+    dCdt[0] = 0
+    dTdt[0] = 0
+y0_init = initial_conc + [T0]  
+if "t_vals" not in st.session_state:
+    st.session_state.t_vals = np.array([0.0])
+    st.session_state.y_vals = np.array(y0_init).reshape(-1, 1)
+
 if st.button("Run Simulation"):
-    y0 = initial_conc + [T0]
-    sol = solve_ivp(odes, [0, time_span], y0, method='RK45', dense_output=True, bounds=(np.zeros_like(y0), np.full_like(y0, np.inf)))
-
-    t_vals = np.linspace(*[0, time_span], 300)
-    y_vals = sol.sol(t_vals)
-
-    st.subheader("Concentration Profiles")
+    t_start = st.session_state.t_vals[-1]
+    t_end = min(t_start + dt_sim, total_time)
     
-    fig, ax = plt.subplots(figsize=(10, 6))
-    for i, label in enumerate(species_labels):
-        ax.plot(t_vals, y_vals[i], label=label)
-    ax.set_xlabel("Time (min)")
-    ax.set_ylabel("Concentration (mol/L)")
-    ax.set_title(f"Concentration Profiles in {reactor_type}")
-    ax.legend()
-    st.pyplot(fig)
-    st.subheader("Temperature Profile")
-    fig1, ax1 = plt.subplots(figsize=(10, 6))
-    ax1.plot(t_vals, y_vals[-1], label='T')
-    T_vals = y_vals[-1] 
-    if mc != 0 and Cpc != 0:
-        Ta2 = [T - (T - Ta1) * np.exp(-U * A / (mc * Cpc)) for T in T_vals]
-    else:
-        Ta2 = T_vals.copy()
-    ax1.plot(t_vals, Ta2, label="Ta")
-    ax1.set_xlabel("Time (min)")
-    ax1.set_ylabel("Temperature (K)")
-    ax1.set_title(f"Temperature Profile in {reactor_type}")
-    ax1.legend()
-    st.pyplot(fig1)
+    y0 = st.session_state.y_vals[:, -1]
+
+    sol = solve_ivp(
+        odes,
+        [t_start, t_end],
+        y0,
+        method='RK45',
+        dense_output=True,
+        bounds=(np.zeros_like(y0), np.full_like(y0, np.inf))
+    )
+
+    t_new = np.linspace(t_start, t_end, 100)
+    y_new = sol.sol(t_new)
+
+    st.session_state.t_vals = np.concatenate((st.session_state.t_vals, t_new[1:]))
+    st.session_state.y_vals = np.concatenate((st.session_state.y_vals, y_new[:, 1:]), axis=1)
+
+st.subheader("Concentration Profiles")
+fig, ax = plt.subplots(figsize=(10, 6))
+for i, label in enumerate(species_labels):
+    ax.plot(st.session_state.t_vals, st.session_state.y_vals[i], label=label)
+ax.set_xlabel("Time (min)")
+ax.set_ylabel("Concentration (mol/L)")
+ax.set_title(f"Concentration Profiles in {reactor_type}")
+ax.legend()
+st.pyplot(fig)
+
+st.subheader("Temperature Profile")
+fig1, ax1 = plt.subplots(figsize=(10, 6))
+T_vals = st.session_state.y_vals[-1]
+ax1.plot(st.session_state.t_vals, T_vals, label='T')
+if mc != 0 and Cpc != 0:
+    Ta2 = [T - (T - Ta1) * np.exp(-U * A / (mc * Cpc)) for T in T_vals]
+else:
+    Ta2 = T_vals.copy()
+ax1.plot(st.session_state.t_vals, Ta2, label="Ta")
+ax1.set_xlabel("Time (min)")
+ax1.set_ylabel("Temperature (K)")
+ax1.set_title(f"Temperature Profile in {reactor_type}")
+ax1.legend()
+st.pyplot(fig1)
