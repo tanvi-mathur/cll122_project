@@ -1,3 +1,3 @@
 To run:
-streamlit run <file>.py
+streamlit run unsteady_state.py
 
