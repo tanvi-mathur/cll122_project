@@ -99,7 +99,7 @@ def rate_laws(conc, T):
         if rxn['fwd_expr']:
             rate_fwd = eval(rxn['fwd_expr'], {}, localr_vars)
         else:
-            rate_fwd = rxn['k_fwd'] * np.prod([localr_vars[label] ** abs(rxn['stoich'].get(label, 0))
+            rate_fwd = rxn['k_fwd']*np.exp((Ea/R) *(1/T0-1/T)) * np.prod([localr_vars[label] ** abs(rxn['stoich'].get(label, 0))
                                                for label in reactant_labels if label in rxn['stoich']])
 
         # Backward rate if reversible
@@ -108,7 +108,7 @@ def rate_laws(conc, T):
             if rxn['bwd_expr']:
                 rate_bwd = eval(rxn['bwd_expr'], {}, localp_vars)
             else:
-                rate_bwd = rxn['k_bwd'] * np.prod([localp_vars[label] ** abs(rxn['stoich'].get(label, 0))
+                rate_bwd = rxn['k_bwd'] *np.exp((Ea/R) *(1/T0-1/T))* np.prod([localp_vars[label] ** abs(rxn['stoich'].get(label, 0))
                                                    for label in product_labels if label in rxn['stoich']])
         
         rate_net = -rate_bwd + rate_fwd  # net rate of progress of the reaction
@@ -153,6 +153,7 @@ def pfr_odes(z, y):
 def odes(t, y):
     C = y[:n_species]
     T = y[-1]
+    
     X=(C[0]-initial_conc[0])/initial_conc[0]
     r = rate_laws(C, T)
     CpS=0
@@ -180,6 +181,8 @@ def odes(t, y):
    
     if reactor_type == "CSTR":
         for i in range(n_species):
+            F = [C[i] * flow_rate for i in range(len(C))]
+            Qr+=(sum(F))* cp*(T - T0)
             dCdt[i] += (flow_rate / V) * (initial_conc[i] - C[i])
             
         dTdt = (-flow_rate*initial_conc[0] * Cp[i] * (T-T0) +Qg-Qr) / CpS
