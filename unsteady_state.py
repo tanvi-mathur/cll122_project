@@ -147,9 +147,9 @@ def pfr_odes(t, y):
             dTdt[i] = -v * (T[i] - T[i-1]) / dz + (Qg[i]) / CpS 
 
     for j in range(1, min(len(rate_array), len(C))):
-        dCdt[j] = -v * (C[j] - C[j-1]) / dz + rate_array[j][j]
+        dCdt[j] = -v * (C[j] - C[j-1]) / dz + rate_array[j][j-1]
 
-    dCdt[0] = 0
+    dCdt[0] = rate_array[0][0]
     dTdt[0] = 0
     T = np.clip(T, 100, 5000)
     C = np.clip(T, 0, None)
@@ -217,7 +217,7 @@ if st.button("Run Simulation"):
     # # Suppose initial_conc is (n_species, n_nodes), and T0 is scalar
     y0=initial_conc+[T0]
     if reactor_type == "PFR":
-        C_init = np.full(N, initial_conc[0])
+        C_init = initial_conc
         T_init = np.full(N, T0)
         y0 = np.concatenate([C_init, T_init])
         sol = solve_ivp(pfr_odes, [0, time_span], y0, method='RK45', dense_output=True)
