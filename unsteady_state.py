@@ -120,7 +120,7 @@ def rate_laws(conc, T):
 
     return rate_list
     
-def pfr_odes(z, y):
+def pfr_odes(t, y):
     C = y[:N]
     T = y[N:]
     Qr = 0
@@ -133,21 +133,26 @@ def pfr_odes(z, y):
 
     deltaH = sum([coeff[i] * Cp[i] * (T - T_ref) for i in range(n_species)])
     dH = [dH_std[i] + deltaH for i in range(n_reactions)]
-    Qg = sum([rate_laws(C, T)[i] * dH[i] for i in range(n_reactions)])
+    rate_array = rate_laws(C, T)
+    Qg = sum([rate_array[i] * dH[i] for i in range(n_reactions)])
     
     dCdt = np.zeros_like(C)
     dTdt = np.zeros_like(T)
-    dz=L/N
+    dz = L / N
+
     for i in range(1, len(T)):
-        r = rate_laws(C, T)[0]
+        if(mc!=0 and Cpc!=0):
+            dTdt[i] = -v * (T[i] - T[i-1]) / dz + (Qg[i] - Qr[i]) / CpS 
+        else:
+            dTdt[i] = -v * (T[i] - T[i-1]) / dz + (Qg[i]) / CpS 
 
-        dCdt[i] = -v * (C[i] - C[i-1]) / dz + r
-        dTdt[i] = -v * (T[i] - T[i-1]) / dz + (Qg[i] - Qr[i]) / CpS
+    for j in range(1, min(len(rate_array), len(C))):
+        dCdt[j] = -v * (C[j] - C[j-1]) / dz + rate_array[j][j]
 
-    # Inlet boundary condition
     dCdt[0] = 0
     dTdt[0] = 0
-
+    T = np.clip(T, 100, 5000)
+    C = np.clip(T, 0, None)
     return np.concatenate((dCdt, dTdt))
 
 def odes(t, y):
@@ -201,7 +206,7 @@ def odes(t, y):
     T = np.clip(T, 200, 5000)
     return list(dCdt) + [dTdt]
 
-time_span = st.sidebar.number_input("Enter time span: ", value=10)
+time_span = st.sidebar.number_input("Enter time span: ", value=10.0)
 if st.button("Run Simulation"):
     t_span = [0, time_span]
     # T_init = np.full(N, T0)
