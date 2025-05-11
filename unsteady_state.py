@@ -76,15 +76,15 @@ st.sidebar.header("4. Initial Conditions")
 initial_conc = [st.sidebar.number_input(f"Initial {label} (mol/m^3)", value=1.0, key=f"r_{label}") for label in reactant_labels]+[st.sidebar.number_input(f"Initial {label} (mol/m^3)", value=1.0, key=f"p_{label}") for label in product_labels]
 
 st.sidebar.header("5. Jacket Heat Transfer")
-U = st.sidebar.number_input("Heat transfer coefficient U (W/m^2-K)", value=100.0)
+U = st.sidebar.number_input("Heat transfer coefficient U (W/m^2-K)", value=10.0)
 A = st.sidebar.number_input("Heat transfer area A (m^2)", value=10.0)
 Ta1 = st.sidebar.number_input("Coolant temperature Ta (K)", value=298.0)
-mc=st.sidebar.number_input("Mass flow rate for coolant", value=0.1)   
-Cpc = st.sidebar.number_input(f"Heat Capacity (C_p) for coolant (J/mol·K)", value=100.0)
-T_ref=st.sidebar.number_input(f"Reference Temperature for Standard Heat of Reaction (K)", value=298)
+mc=st.sidebar.number_input("Mass flow rate for coolant", value=10)   
+Cpc = st.sidebar.number_input(f"Heat Capacity (C_p) for coolant (J/mol·K)", value=10.0)
+T_ref=st.sidebar.number_input(f"Reference Temperature for Standard Heat of Reaction (K)", value=290)
 dH_std=[]
 for i in range(n_reactions):
-    dH_std.append(st.sidebar.number_input(f"Standard Heat of reaction {i} at {T_ref} K (J/mol)", value=100.0, key=f"h_{i}"))
+    dH_std.append(st.sidebar.number_input(f"Standard Heat of reaction {i} at {T_ref} K (J/mol)", value=-500.0, key=f"h_{i}"))
 
 def rate_laws(conc, T):
     rate_list = [0.0 for _ in range(n_species)]  # initialize rate list for all species
